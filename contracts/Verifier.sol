@@ -19,9 +19,9 @@
 pragma solidity ^0.6.4;
 
 contract Verifier {
-    // Preset 2048 bit mod
-    bytes constant MODULUS = hex"C7970CEEDCC3B0754490201A7AA613CD73911081C790F5F1A8726F463550BB5B7FF0DB8E1EA1189EC72F93D1650011BD721AEEACC2ACDE32A04107F0648C2813A31F5B0B7765FF8B44B4B6FFC93384B646EB09C7CF5E8592D40EA33C80039F35B4F14A04B51F7BFD781BE4D1673164BA8EB991C2C4D730BBBE35F592BDEF524AF7E8DAEFD26C66FC02C479AF89D64D373F442709439DE66CEB955F3EA37D5159F6135809F85334B5CB1813ADDC80CD05609F10AC6A95AD65872C909525BDAD32BC729592642920F24C61DC5B3C3B7923E56B16A4D9D373D8721F24A3FC0F1B3131F55615172866BCCC30F95054C824E733A5EB6817F7BC16399D48C6361CC7E5";
-    bytes constant HALF_MOD = hex"63CB86776E61D83AA248100D3D5309E6B9C88840E3C87AF8D43937A31AA85DADBFF86DC70F508C4F6397C9E8B28008DEB90D775661566F19502083F832461409D18FAD85BBB2FFC5A25A5B7FE499C25B237584E3E7AF42C96A07519E4001CF9ADA78A5025A8FBDFEBC0DF268B398B25D475CC8E1626B985DDF1AFAC95EF7A9257BF46D77E936337E01623CD7C4EB269B9FA21384A1CEF33675CAAF9F51BEA8ACFB09AC04FC299A5AE58C09D6EE406682B04F8856354AD6B2C396484A92DED6995E394AC9321490792630EE2D9E1DBC91F2B58B526CE9B9EC390F9251FE078D9898FAAB0A8B94335E66187CA82A64127399D2F5B40BFBDE0B1CCEA4631B0E63F2";
+    // Preset 1024 bit mod
+    bytes constant MODULUS   = hex"C05748BBFB5ACD7E5A77DC03D9EC7D8BB957C1B95D9B206090D83FD1B67433CE83EAD7376CCFD612C72901F4CE0A2E07E322D438EA4F34647555D62D04140E1084E999BB4CD5F947A76674009E2318549FD102C5F7596EDC332A0DDEE3A355186B9A046F0F96A279C1448A9151549DC663DA8A6E89CF8F511BAED6450DA2C1CB";
+    bytes constant HALF_MOD  = hex"602BA45DFDAD66BF2D3BEE01ECF63EC5DCABE0DCAECD9030486C1FE8DB3A19E741F56B9BB667EB09639480FA67051703F1916A1C75279A323AAAEB16820A07084274CCDDA66AFCA3D3B33A004F118C2A4FE88162FBACB76E199506EF71D1AA8C35CD023787CB513CE0A24548A8AA4EE331ED453744E7C7A88DD76B2286D160E5";
 
     // Version of VDF verification which uses more calldata
     function verify_vdf_proof(bytes32 input_random, bytes memory y, bytes memory pi, uint256 iterations, uint256 prime) public view {
@@ -102,8 +102,15 @@ contract Verifier {
     function almost_mulmod(bytes memory a, bytes memory b, bytes memory mod) internal view returns(bytes memory c) {
         bytes memory part1 = bignum_expmod(modular_add(a, b), 2, mod);
         bytes memory part2 = bignum_expmod(modular_sub(a, b), 2, mod);
-        // Returns (a+b)^2 - (a-b)^2 = 4ab
-        return modular_sub(part1, part2);
+        part1 = trim(part1);
+        part2 = trim(part2);
+        // We don't know which of part1 or part2 will be smaller given the modulus
+        if (lte(part1, part2)) {
+            return modular_sub(part2, part1);
+        } else {
+            // Returns (a+b)^2 - (a-b)^2 = 4ab
+            return modular_sub(part1, part2);
+        }
     }
 
     // Uses the mod const in the contract and assumes that a < Mod, b < Mod
@@ -305,8 +312,8 @@ contract Verifier {
     // Thanks to Dankrad Feist for the bignum exp, hash to prime, and prime test.
     // https://github.com/dankrad/rsa-bounty/blob/master/contract/rsa_bounty.sol
     
-    uint256 constant prime_mask = 0x7fff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_f000;
-        
+    uint256 constant prime_mask = 0x7f_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_f000;
+
     // This function checks if:
     // (1) If h = Hash(input_random, y)
     //    (1a) That h is equal to prime except at the 12 last bits and the most signifigant bit.
@@ -316,7 +323,7 @@ contract Verifier {
     function check_hash_to_prime(bytes32 input_random, bytes memory y, uint256 prime) public view {
         // Check p is correct result for hash-to-prime
         require(prime & prime_mask == uint(sha256(abi.encodePacked(input_random, y))) & prime_mask);
-        require(prime > (1 << 255));
+        require(prime > (1 << 167));
         require(miller_rabin_test(prime));
     }
     
