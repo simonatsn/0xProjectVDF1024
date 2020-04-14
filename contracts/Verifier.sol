@@ -104,13 +104,7 @@ contract Verifier {
         bytes memory part2 = bignum_expmod(modular_sub(a, b), 2, mod);
         part1 = trim(part1);
         part2 = trim(part2);
-        // We don't know which of part1 or part2 will be smaller given the modulus
-        if (lte(part1, part2)) {
-            return modular_sub(part2, part1);
-        } else {
-            // Returns (a+b)^2 - (a-b)^2 = 4ab
-            return modular_sub(part1, part2);
-        }
+        return modular_sub(part1, part2);
     }
 
     // Uses the mod const in the contract and assumes that a < Mod, b < Mod
@@ -129,7 +123,7 @@ contract Verifier {
         if (lte(b, a)) {
             return big_sub(a, b);
         } else {
-            return (big_sub(MODULUS, big_sub(b, a)));
+            return big_sub(b, a);
         }
     }
 
